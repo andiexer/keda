@@ -58,6 +58,7 @@ type kafkaMetadata struct {
 	bootstrapServers       []string
 	group                  string
 	topic                  string
+	excludedTopics         []string
 	partitionLimitation    []int32
 	lagThreshold           int64
 	activationLagThreshold int64
@@ -723,7 +724,9 @@ func (s *kafkaScaler) getTopicPartitions() (map[string][]int32, error) {
 		}
 
 		for topicName := range listCGOffsetResponse.Blocks {
-			topicsToDescribe = append(topicsToDescribe, topicName)
+			if s.isNotExcludedTopic(topicName) {
+				topicsToDescribe = append(topicsToDescribe, topicName)
+			}
 		}
 	} else {
 		topicsToDescribe = []string{s.metadata.topic}
@@ -761,6 +764,20 @@ func (s *kafkaScaler) getTopicPartitions() (map[string][]int32, error) {
 		topicPartitions[topicMetadata.Name] = partitions
 	}
 	return topicPartitions, nil
+}
+
+func (s *kafkaScaler) isNotExcludedTopic(topic string) bool {
+	if len(s.metadata.excludedTopics) == 0 {
+		return false
+	}
+
+	for _, excludedTopic := range s.metadata.excludedTopics {
+		if topic == excludedTopic {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *kafkaScaler) isActivePartition(pID int32) bool {
